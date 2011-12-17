@@ -5,6 +5,7 @@
 
 module Main where
 import Data.HashMap
+import Data.List
 
 data NodeType = Start | End | Space
                 deriving Show
@@ -31,7 +32,7 @@ type MazeMap = Map (Int,Int) Node
 
 
 insertNode :: MazeMap -> (Int,Int) -> NodeType -> MazeMap
-insertNode mazeMap (x,y) nType = insert (x,y) node rightMap where
+insertNode mazeMap (x,y) nType = Data.HashMap.insert (x,y) node rightMap where
                    rightMap  = updateMazeMap leftMap rightNode
                    leftMap   = updateMazeMap downMap leftNode
                    downMap   = updateMazeMap upMap downNode
@@ -59,4 +60,12 @@ updateNode (N coords nType sol u d l _) (x,y) R = (N coords nType sol u d l (Nd 
 
 updateMazeMap :: MazeMap -> Node -> MazeMap
 updateMazeMap mazeMap E = mazeMap
-updateMazeMap mazeMap node@(N coords _ _ _ _ _ _) = insert coords node mazeMap
+updateMazeMap mazeMap node@(N coords _ _ _ _ _ _) = Data.HashMap.insert coords node mazeMap
+
+getCoords :: Char -> [String] -> [(Int,Int)]
+getCoords c ss = aux c ss 0 where
+          aux _ []      _ = []
+          aux cc (x:xs) n = (getColNumbers cc x n) ++ (aux cc xs (n+1))
+
+getColNumbers :: Char -> String -> Int -> [(Int,Int)]
+getColNumbers c s lineNum = Data.List.map (\x -> (lineNum,x)) $ elemIndices c s
