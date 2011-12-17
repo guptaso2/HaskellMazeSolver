@@ -7,6 +7,11 @@ module Main where
 import Data.HashMap
 import Data.List
 
+main :: IO ()
+main = do 
+  s <- readLines "test.txt"
+  putStrLn $ show s
+
 data NodeType = Start | End | Space
                 deriving Show
 
@@ -69,3 +74,8 @@ getCoords c ss = aux c ss 0 where
 
 getColNumbers :: Char -> String -> Int -> [(Int,Int)]
 getColNumbers c s lineNum = Data.List.map (\x -> (lineNum,x)) $ elemIndices c s
+
+readLines :: String -> IO [String]
+readLines filePath =   do
+                       s <- readFile filePath
+                       return $ lines s
