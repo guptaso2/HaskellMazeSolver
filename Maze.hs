@@ -113,10 +113,20 @@ readLines filePath =   do
                        s <- readFile filePath
                        return $ lines s
 
-{--dijkstra :: (Int,Int) -> MazeMap -> Map (Int,Int) (Int, Maybe (Int,Int))
-dijkstra source@(sx,sy) graph =
+dijkstra :: (Int,Int) -> MazeMap -> Map (Int,Int) (Float, Maybe (Int,Int))
+dijkstra source mazemap =
          f (fromList [(v, (if v == source then 0 else 1/0, Nothing))
                           | v <- keys graph]) (keys graph) where
+         graph = fromList[(v, nodesToCoords $ mazemap ! v) | v <- keys mazemap]
          f ds [] = ds
-         f ds q = f (foldr relax ds graph ! m) (delete m q) where
-                  m = K.minimum (fst . (ds !)) q --}
+         f ds q = f (foldr relax ds $ graph ! m) (L.delete m q) where
+                  m = K.minimum (fst . (ds !)) q
+                  relax (e,d) = adjust (min (fst (ds ! m) + d, Just m)) e
+
+shortestPath :: (Int,Int) -> (Int, Int) -> MazeMap -> [(Int,Int)]
+shortestPath from to mazemap = reverse $ f to where
+             f x = x : maybe [] f (snd $ dijkstra from mazemap ! x)
+
+nodesToCoords :: Node -> [((Int,Int),Float)]
+nodesToCoords (N _ _ _ x) = L.map (\n -> (n,1)) x
+nodesToCoords E = []
