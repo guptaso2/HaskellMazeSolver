@@ -47,10 +47,10 @@ insertNode mazeMap (x,y) nType = Data.HashMap.insert (x,y) node rightMap where
                    downNodeD  = getDirectionNode $ downNode
                    leftNodeD  = getDirectionNode $ leftNode
                    rightNodeD = getDirectionNode $ rightNode
-                   upNode    = updateNode (findWithDefault E (x,y-1) mazeMap) (x,y) D
-                   downNode  = updateNode (findWithDefault E (x,y+1) mazeMap) (x,y) U
-                   leftNode  = updateNode (findWithDefault E (x-1,y) mazeMap) (x,y) R
-                   rightNode = updateNode (findWithDefault E (x+1,y) mazeMap) (x,y) L
+                   upNode    = updateNode (findWithDefault E (x-1,y) mazeMap) (x,y) D
+                   downNode  = updateNode (findWithDefault E (x+1,y) mazeMap) (x,y) U
+                   leftNode  = updateNode (findWithDefault E (x,y-1) mazeMap) (x,y) R
+                   rightNode = updateNode (findWithDefault E (x,y+1) mazeMap) (x,y) L
 
 getDirectionNode :: Node -> DirectionNode
 getDirectionNode E                 = Ed
