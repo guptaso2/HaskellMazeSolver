@@ -58,7 +58,7 @@ showCell mazeMap row col = case nType of
   
 getNodeType :: Node -> NodeType
 getNodeType E = Wall
-getNodeType (N _ nType _ _ _ _ _) = nType
+getNodeType (N _ nType _ _) = nType
 
 
 buildMazeMap :: [String] -> MazeMap
