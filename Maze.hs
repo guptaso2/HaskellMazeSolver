@@ -127,6 +127,24 @@ shortestPath :: (Int,Int) -> (Int, Int) -> MazeMap -> [(Int,Int)]
 shortestPath from to mazemap = reverse $ f to where
              f x = x : maybe [] f (snd $ dijkstra from mazemap ! x)
 
+solveMaze :: MazeMap -> MazeMap
+solveMaze mazemap = foldr (\k m -> adjust markAsSolution k m) mazemap sol where
+          sol = shortestPath start end mazemap where
+              start = head $ L.filter (\x -> isStart $ mazemap ! x) $ keys mazemap
+              end   = head $ L.filter (\x -> isEnd $ mazemap ! x) $ keys mazemap
+
+isStart :: Node -> Bool
+isStart (N _ Start _ _) = True
+isStart _               = False
+
+isEnd :: Node -> Bool
+isEnd   (N _ End   _ _) = True
+isEnd   _               = False
+
+markAsSolution :: Node -> Node
+markAsSolution E = E
+markAsSolution (N coords ntype _ neighbors) = (N coords ntype True neighbors)
+
 nodesToCoords :: Node -> [((Int,Int),Float)]
 nodesToCoords (N _ _ _ x) = L.map (\n -> (n,1)) x
 nodesToCoords E = []
