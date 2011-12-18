@@ -11,9 +11,14 @@ import Data.List.Key as K
 main :: IO ()
 main = do 
   s <- readLines "test.txt"
-  putStrLn $ show s
+  putStrLn $ "Rows:\n" ++ (show s)
+  let height = length s
+  let width = length $ head s
+  let mazeMap = buildMazeMap s 
+  putStrLn $ "MazeMap:\n" ++ (show mazeMap)
+  putStrLn $ "Maze:\n" ++ (showMaze mazeMap height width)
 
-data NodeType = Start | End | Space
+data NodeType = Start | End | Space | Wall
                 deriving Show
 
 data DirectionNode = Ed
@@ -30,6 +35,42 @@ data Node = E               -- Empty Node
 
 type MazeMap = Map (Int,Int) Node
 
+showMaze :: MazeMap -> Int -> Int -> String
+showMaze mazeMap height width = showRows mazeMap (height-1) (width-1)
+
+showRows :: MazeMap -> Int -> Int -> String
+showRows mazeMap 0      width = showRow mazeMap 0 width
+showRows mazeMap height width = (showRows mazeMap (height-1) width) ++ 
+                                '\n' : (showRow mazeMap height width)
+                                
+showRow :: MazeMap -> Int -> Int -> String
+showRow mazeMap row 0     = showCell mazeMap row 0
+showRow mazeMap row width =  (showRow mazeMap row (width-1)) ++ (showCell mazeMap row width)
+
+showCell :: MazeMap -> Int -> Int -> String
+showCell mazeMap row col = case nType of
+  Space -> " "
+  Start -> "S"
+  End   -> "E"
+  Wall  -> "*"
+  where
+    nType = getNodeType $ findWithDefault E (row,col) mazeMap
+  
+getNodeType :: Node -> NodeType
+getNodeType E = Wall
+getNodeType (N _ nType _ _ _ _ _) = nType
+
+
+buildMazeMap :: [String] -> MazeMap
+buildMazeMap rows = mazeMap
+  where
+    start = insertNodes empty (getCoords 'S' rows) Start
+    spaces = insertNodes start (getCoords ' ' rows) Space
+    mazeMap = insertNodes spaces (getCoords 'E' rows) End
+
+insertNodes :: MazeMap -> [(Int,Int)] -> NodeType -> MazeMap
+insertNodes mm coords n = foldr helper mm coords
+  where helper coord m = insertNode m coord n
 
 insertNode :: MazeMap -> (Int,Int) -> NodeType -> MazeMap
 insertNode mazeMap (x,y) nType = M.insert (x,y) node rightMap where
