@@ -91,7 +91,37 @@ genRandomMaze height width = do
                       (choose ((width `div` 2)-1, width-1))
       genEndColPt   = liftM (\ row -> (row, width-1)) 
                       (choose ((height `div` 2)-1, height-1))
-    
+                      
+genRandomMaze' :: Int -> Int -> Gen MazeMap
+genRandomMaze' height width = do 
+    spaces <- genRows height width
+    start  <- oneof [genStartRowPt, genStartColPt]
+    end    <- oneof [genEndRowPt, genEndColPt]
+    sol    <- randomPath start end
+    let randomCells = insertNodes empty spaces Space
+        solvable = insertNodes randomCells sol Space
+        startable = insertNode solvable start Start
+        endable = insertNode startable end End
+    return $ endable
+    where
+      genStartRowPt = liftM ((,) 0) (choose (0, ((width `div` 2)-1)))
+      genStartColPt = liftM (\ row -> (row, 0)) 
+                      (choose (0, ((height `div` 2)-1)))
+      genEndRowPt   = liftM ((,) (height-1)) 
+                      (choose ((width `div` 2)-1, width-1))
+      genEndColPt   = liftM (\ row -> (row, width-1)) 
+                      (choose ((height `div` 2)-1, height-1))    
+                      
+genPaths :: Int -> Int -> Gen [(Int, Int)]
+genPaths height width = do
+  startPt <- genPt height width
+  endPt   <- genPt height width
+  liftM concat $ vectorOf 4 $ randomPath (5,1) (6,5)
+  
+genPt :: Int -> Int -> Gen (Int, Int)
+genPt height width = liftM2 (,) (choose (0, height-1)) (choose (0, width-1))
+
+
 randomPath :: (Int,Int) -> (Int,Int) -> Gen [(Int,Int)]
 randomPath (sx, sy) (ex, ey) 
   | (sx == ex) && (sy == ey) = do
@@ -118,7 +148,7 @@ genRows 0 width =  genRow 0 width
 genRows height width = liftM2 (++) (genRows (height-1) width) 
                        (genRow height width)
 
-genRow :: Int -> Int -> Gen[(Int, Int)]
+genRow :: Int -> Int -> Gen [(Int, Int)]
 genRow row 0     = do   
   cell <- genCell row 0
   return $ cell ++ []
@@ -126,7 +156,7 @@ genRow row width = liftM2 (++) (genCell row width) (genRow row (width-1))
 
 genCell :: Int -> Int -> Gen [(Int, Int)]
 genCell row col = frequency [ (7, return [])
-                            , (3, return [(row, col)]) ]                       
+                            , (3, return [(row, col)]) ]
 
 -- Display Functions
 showMaze :: MazeMap -> Int -> Int -> String
