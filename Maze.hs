@@ -1,12 +1,14 @@
 -- Maze.hs
 -- by Sonny Gupta guptason (and  Kaushik Ganguly kganguly)
 
-{-# OPTIONS -Wall -fwarn-tabs -fno-warn-type-defaults #-}
+{-# OPTIONS -Wall -fwarn-tabs -fno-warn-type-defaults -XTypeSynonymInstances #-}
 
 module Main where
 import Data.HashMap as M
 import Data.List as L
 import Data.List.Key as K
+import Control.Monad
+import Test.QuickCheck
 
 main :: IO ()
 main = do 
@@ -18,7 +20,7 @@ main = do
   putStrLn $ "MazeMap:\n" ++ (show mazeMap)
   putStrLn $ "Maze:\n" ++ (showMaze mazeMap height width)
 
-data NodeType = Start | End | Space | Wall
+data NodeType = Start | End | Space
                 deriving Show
 
 data DirectionNode = Ed
@@ -35,6 +37,101 @@ data Node = E               -- Empty Node
 
 type MazeMap = Map (Int,Int) Node
 
+readLines :: String -> IO [String]
+readLines filePath =   do
+                       s <- readFile filePath
+                       return $ lines s
+                       
+-- Arbitrary MazeMap Generation
+instance Arbitrary MazeMap where
+  arbitrary = do 
+    height <- genDimension
+    width  <- genDimension
+    cells  <- genRows height width
+    return $ insertNodes empty cells Space
+
+solveRandomMaze :: IO ()
+solveRandomMaze = do
+  putStrLn $ "Random Maze:\n"
+  heights <- sample' genDimension
+  let height = head heights
+  widths <- sample' genDimension
+  let width = head widths      
+  mazes <- sample' $ genRandomMaze height width
+  let maze = head mazes
+  putStrLn $ showMaze (maze) height width
+  let solvedMaze = solveMaze maze
+  putStrLn $ "Solved Maze:\n"
+  putStrLn $ showMaze (solvedMaze) height width
+
+showRandomMaze :: IO ()
+showRandomMaze = do
+  mazes <- sample' genMazeMap
+  putStrLn $ showMaze (head mazes) 20 20
+  
+showRandomMaze' :: IO ()
+showRandomMaze' = do
+  heights <- sample' genDimension
+  let height = head heights
+  widths <- sample' genDimension
+  let width = head widths      
+  mazes <- sample' $ genRandomMaze height width
+  putStrLn $ showMaze (head mazes) height width
+  
+genMazeMap :: Gen MazeMap
+genMazeMap = arbitrary
+
+genRandomMaze :: Int -> Int -> Gen MazeMap
+genRandomMaze height width = do 
+    spaces <- genRows height width
+    start  <- oneof [genStartRowPt, genStartColPt]
+    end    <- oneof [genEndRowPt, genEndColPt]
+    sol    <- randomPath start end
+    let endable = insertNode startable end End
+        startable = insertNode solvable start Start
+        solvable = insertNodes randomCells sol Space
+        randomCells = insertNodes empty spaces Space
+    return $ endable
+    where
+      genStartRowPt = liftM ((,) 0) (choose (0, ((width `div` 2)-1)))
+      genStartColPt = liftM (\ row -> (row, 0)) (choose (0, ((height `div` 2)-1)))
+      genEndRowPt   = liftM ((,) (height-1)) (choose ((width `div` 2)-1, width-1))
+      genEndColPt   = liftM (\ row -> (row, width-1)) (choose ((height `div` 2)-1, height-1))
+    
+randomPath :: (Int,Int) -> (Int,Int) -> Gen [(Int,Int)]
+randomPath (sx, sy) (ex, ey) 
+  | (sx == ex) && (sy == ey) = do
+    return $ (ex, ey) : []
+  | otherwise = do
+    (nx, ny) <- gennxny
+    liftM ((sx, sy) :) (randomPath (nx, ny) (ex, ey))
+    where 
+      gennx   = suchThat (liftM (sx+) (frequency [(4, return (-1)), (6, return 1)]))              
+                (\x -> (x <= ex) && (x > 0)) 
+      genny   = suchThat (liftM (sy+) (frequency [(1, return (-1)), (3, return 1)]))              
+                (\y -> (y <= ey) && (y > 0))
+      gennxny = oneof [genxny, gennxy]
+      genxny  = liftM ((,) sx) genny
+      gennxy  = liftM (\ x -> (x, sy)) gennx
+      
+genDimension :: Gen Int
+genDimension = elements [15 .. 30]
+
+genRows :: Int -> Int -> Gen [(Int, Int)]
+genRows 0 width =  genRow 0 width
+genRows height width = liftM2 (++) (genRows (height-1) width) (genRow height width)
+
+genRow :: Int -> Int -> Gen[(Int, Int)]
+genRow row 0     = do   
+  cell <- genCell row 0
+  return $ cell ++ []
+genRow row width = liftM2 (++) (genCell row width) (genRow row (width-1))
+
+genCell :: Int -> Int -> Gen [(Int, Int)]
+genCell row col = frequency [ (7, return [])
+                            , (3, return [(row, col)]) ]                       
+
+-- Display Functions
 showMaze :: MazeMap -> Int -> Int -> String
 showMaze mazeMap height width = showRows mazeMap (height-1) (width-1)
 
@@ -48,19 +145,16 @@ showRow mazeMap row 0     = showCell mazeMap row 0
 showRow mazeMap row width =  (showRow mazeMap row (width-1)) ++ (showCell mazeMap row width)
 
 showCell :: MazeMap -> Int -> Int -> String
-showCell mazeMap row col = case nType of
-  Space -> " "
-  Start -> "S"
-  End   -> "E"
-  Wall  -> "*"
+showCell mazeMap row col = case node of
+  N _ Space True  _ -> "+"
+  N _ Space False _ -> " "
+  N _ Start _     _ -> "S"
+  N _ End   _     _ -> "E"
+  E                 -> "*"
   where
-    nType = getNodeType $ findWithDefault E (row,col) mazeMap
+    node = findWithDefault E (row,col) mazeMap
   
-getNodeType :: Node -> NodeType
-getNodeType E = Wall
-getNodeType (N _ nType _ _) = nType
-
-
+-- Construction Functions
 buildMazeMap :: [String] -> MazeMap
 buildMazeMap rows = mazeMap
   where
@@ -108,11 +202,7 @@ getCoords c ss = aux c ss 0 where
 getColNumbers :: Char -> String -> Int -> [(Int,Int)]
 getColNumbers c s lineNum = L.map (\x -> (lineNum,x)) $ elemIndices c s
 
-readLines :: String -> IO [String]
-readLines filePath =   do
-                       s <- readFile filePath
-                       return $ lines s
-
+-- Solver Functions
 dijkstra :: (Int,Int) -> MazeMap -> Map (Int,Int) (Float, Maybe (Int,Int))
 dijkstra source mazemap =
          f (fromList [(v, (if v == source then 0 else 1/0, Nothing))
