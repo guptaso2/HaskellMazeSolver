@@ -47,8 +47,7 @@ instance Arbitrary MazeMap where
   arbitrary = do 
     height <- genDimension
     width  <- genDimension
-    cells  <- genRows height width
-    return $ insertNodes empty cells Space
+    genRandomMaze height width
 
 solveRandomMaze :: IO ()
 solveRandomMaze = do
@@ -64,11 +63,6 @@ solveRandomMaze = do
   putStrLn $ "Solved Maze:\n"
   putStrLn $ showMaze (solvedMaze) height width
 
-showRandomMaze :: IO ()
-showRandomMaze = do
-  mazes <- sample' genMazeMap
-  putStrLn $ showMaze (head mazes) 20 20
-  
 showRandomMaze' :: IO ()
 showRandomMaze' = do
   heights <- sample' genDimension
@@ -78,25 +72,25 @@ showRandomMaze' = do
   mazes <- sample' $ genRandomMaze height width
   putStrLn $ showMaze (head mazes) height width
   
-genMazeMap :: Gen MazeMap
-genMazeMap = arbitrary
-
 genRandomMaze :: Int -> Int -> Gen MazeMap
 genRandomMaze height width = do 
     spaces <- genRows height width
     start  <- oneof [genStartRowPt, genStartColPt]
     end    <- oneof [genEndRowPt, genEndColPt]
     sol    <- randomPath start end
-    let endable = insertNode startable end End
-        startable = insertNode solvable start Start
+    let randomCells = insertNodes empty spaces Space
         solvable = insertNodes randomCells sol Space
-        randomCells = insertNodes empty spaces Space
+        startable = insertNode solvable start Start
+        endable = insertNode startable end End
     return $ endable
     where
       genStartRowPt = liftM ((,) 0) (choose (0, ((width `div` 2)-1)))
-      genStartColPt = liftM (\ row -> (row, 0)) (choose (0, ((height `div` 2)-1)))
-      genEndRowPt   = liftM ((,) (height-1)) (choose ((width `div` 2)-1, width-1))
-      genEndColPt   = liftM (\ row -> (row, width-1)) (choose ((height `div` 2)-1, height-1))
+      genStartColPt = liftM (\ row -> (row, 0)) 
+                      (choose (0, ((height `div` 2)-1)))
+      genEndRowPt   = liftM ((,) (height-1)) 
+                      (choose ((width `div` 2)-1, width-1))
+      genEndColPt   = liftM (\ row -> (row, width-1)) 
+                      (choose ((height `div` 2)-1, height-1))
     
 randomPath :: (Int,Int) -> (Int,Int) -> Gen [(Int,Int)]
 randomPath (sx, sy) (ex, ey) 
@@ -106,9 +100,11 @@ randomPath (sx, sy) (ex, ey)
     (nx, ny) <- gennxny
     liftM ((sx, sy) :) (randomPath (nx, ny) (ex, ey))
     where 
-      gennx   = suchThat (liftM (sx+) (frequency [(4, return (-1)), (6, return 1)]))              
+      gennx   = suchThat (liftM (sx+) 
+                          (frequency [(4, return (-1)), (6, return 1)]))
                 (\x -> (x <= ex) && (x > 0)) 
-      genny   = suchThat (liftM (sy+) (frequency [(1, return (-1)), (3, return 1)]))              
+      genny   = suchThat (liftM (sy+) 
+                          (frequency [(1, return (-1)), (3, return 1)]))
                 (\y -> (y <= ey) && (y > 0))
       gennxny = oneof [genxny, gennxy]
       genxny  = liftM ((,) sx) genny
@@ -119,7 +115,8 @@ genDimension = elements [15 .. 30]
 
 genRows :: Int -> Int -> Gen [(Int, Int)]
 genRows 0 width =  genRow 0 width
-genRows height width = liftM2 (++) (genRows (height-1) width) (genRow height width)
+genRows height width = liftM2 (++) (genRows (height-1) width) 
+                       (genRow height width)
 
 genRow :: Int -> Int -> Gen[(Int, Int)]
 genRow row 0     = do   
@@ -142,7 +139,8 @@ showRows mazeMap height width = (showRows mazeMap (height-1) width) ++
                                 
 showRow :: MazeMap -> Int -> Int -> String
 showRow mazeMap row 0     = showCell mazeMap row 0
-showRow mazeMap row width =  (showRow mazeMap row (width-1)) ++ (showCell mazeMap row width)
+showRow mazeMap row width =  (showRow mazeMap row (width-1)) ++ 
+                             (showCell mazeMap row width)
 
 showCell :: MazeMap -> Int -> Int -> String
 showCell mazeMap row col = case node of
@@ -173,11 +171,16 @@ insertNode mazeMap (x,y) nType = M.insert (x,y) node rightMap where
                    downMap   = updateMazeMap upMap downNode
                    upMap     = updateMazeMap mazeMap upNode
                    node      = N (x,y) nType False neighbors
-                   neighbors = makeNeighborList [upNode, downNode, leftNode, rightNode]
-                   upNode    = updateNode (findWithDefault E (x-1,y) mazeMap) (x,y)
-                   downNode  = updateNode (findWithDefault E (x+1,y) mazeMap) (x,y)
-                   leftNode  = updateNode (findWithDefault E (x,y-1) mazeMap) (x,y)
-                   rightNode = updateNode (findWithDefault E (x,y+1) mazeMap) (x,y)
+                   neighbors = makeNeighborList 
+                               [upNode, downNode, leftNode, rightNode]
+                   upNode    = updateNode 
+                               (findWithDefault E (x-1,y) mazeMap) (x,y)
+                   downNode  = updateNode 
+                               (findWithDefault E (x+1,y) mazeMap) (x,y)
+                   leftNode  = updateNode 
+                               (findWithDefault E (x,y-1) mazeMap) (x,y)
+                   rightNode = updateNode 
+                               (findWithDefault E (x,y+1) mazeMap) (x,y)
 
 makeNeighborList::[Node] -> [(Int,Int)]
 makeNeighborList l = L.map g $ L.filter f l where
@@ -220,8 +223,10 @@ shortestPath from to mazemap = reverse $ f to where
 solveMaze :: MazeMap -> MazeMap
 solveMaze mazemap = foldr (\k m -> adjust markAsSolution k m) mazemap sol where
           sol = shortestPath start end mazemap where
-              start = head $ L.filter (\x -> isStart $ mazemap ! x) $ keys mazemap
-              end   = head $ L.filter (\x -> isEnd $ mazemap ! x) $ keys mazemap
+              start = head $ L.filter (\x -> isStart $ mazemap ! x) 
+                      $ keys mazemap
+              end   = head $ L.filter (\x -> isEnd $ mazemap ! x) 
+                      $ keys mazemap
 
 isStart :: Node -> Bool
 isStart (N _ Start _ _) = True
