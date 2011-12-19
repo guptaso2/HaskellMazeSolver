@@ -10,13 +10,15 @@ import Data.List.Key as K
 
 main :: IO ()
 main = do 
-  s <- readLines "test.txt"
-  putStrLn $ "Rows:\n" ++ (show s)
+  putStrLn $ "Please enter a map filename:"
+  filename <- getLine
+  s <- readLines filename
   let height = length s
   let width = length $ head s
   let mazeMap = buildMazeMap s 
-  putStrLn $ "MazeMap:\n" ++ (show mazeMap)
   putStrLn $ "Maze:\n" ++ (showMaze mazeMap height width)
+  let solvedMaze = solveMaze mazeMap
+  putStrLn $ "Solution:\n" ++ (showMaze solvedMaze height width)
 
 data NodeType = Start | End | Space | Wall
                 deriving Show
@@ -48,18 +50,16 @@ showRow mazeMap row 0     = showCell mazeMap row 0
 showRow mazeMap row width =  (showRow mazeMap row (width-1)) ++ (showCell mazeMap row width)
 
 showCell :: MazeMap -> Int -> Int -> String
-showCell mazeMap row col = case nType of
-  Space -> " "
-  Start -> "S"
-  End   -> "E"
-  Wall  -> "*"
-  where
-    nType = getNodeType $ findWithDefault E (row,col) mazeMap
-  
+showCell mazeMap row col = case (findWithDefault E (row,col) mazeMap) of
+  (N _ Space False _) -> " "
+  (N _ Space True _)  -> "+"
+  (N _ Start _ _)     -> "S"
+  (N _ End _ _)       -> "E"
+  E                   -> "*"
+
 getNodeType :: Node -> NodeType
 getNodeType E = Wall
 getNodeType (N _ nType _ _) = nType
-
 
 buildMazeMap :: [String] -> MazeMap
 buildMazeMap rows = mazeMap
