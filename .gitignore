@@ -5,3 +5,9 @@ main
 main.app/Contents/Info.plist
 main.app/Contents/MacOS/main
 main.app/Contents/PgkInfo
+MazeGUI.hi
+MazeGUI.o
+RandomMaze.hi
+RandomMaze.o
+Solver.hi
+Solver.o
