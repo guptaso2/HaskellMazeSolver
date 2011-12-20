@@ -1,0 +1,34 @@
+Sonny Gupta <guptason>
+Kaushik Ganguly <kganguly>
+
+To compile and run the project run the shell script compile.sh
+
+Extra libraries that you will require:
+Data.HashMap
+Data.List.Key
+WXHaskell
+
+To install WXHaskell on a mac you want to follow the directions here:
+http://haskell.org/haskellwiki/WxHaskell/MacOS_X
+
+also install utility-ht with cabal.
+
+The shell script will launch the GUI app.
+
+You can also run Maze.hs in GHCI to run any of the code excluding the GUI,
+in case you want to see how it works without having to install all the graphical
+libraries (which are a huge pain).
+
+Components:
+Maze.hs - runs a simple cmdline function that lets you load a maze file and solves
+it
+
+MazeGUI.hs - the gui component of the project.
+
+Solver.hs - code that can read mazes from a file and solve mazes using dijkstra's
+algorithm.
+
+RandomMaze.hs - generates arbitrary mazes based on a given height and width. All
+mazes generated ARE solveable.
+
+Tests.hs - unit tests.
