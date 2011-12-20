@@ -132,7 +132,7 @@ cmdLine = do
   let solvedMaze = solveMaze mazeMap
   putStrLn $ "Solution:\n" ++ (showMaze solvedMaze height width)
 
-data NodeType = Start | End | Space | Wall
+data NodeType = Start | End | Space
                 deriving Show
 
 data DirectionNode = Ed
