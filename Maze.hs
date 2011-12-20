@@ -9,16 +9,128 @@ import Data.List as L
 import Data.List.Key as K
 import Control.Monad
 import Test.QuickCheck
+import Graphics.UI.WX as G
+
+cellDim :: Int
+cellDim = 15
+
+defPuzWidth :: Int
+defPuzWidth = 35
+
+defPuzHeight :: Int
+defPuzHeight = 17
 
 main :: IO ()
-main = do 
-  s <- readLines "test.txt"
-  putStrLn $ "Rows:\n" ++ (show s)
+main
+  = start mazeGui
+
+mapFiles :: [(String,[String])]
+mapFiles
+   = [("Text Files",["*.txt"])]
+
+mazeGui :: IO ()
+mazeGui
+  = do -- the application frame
+       f <- frame [text := "Maze Solver!", clientSize := sz 600 600]
+       mazemap <- variable [value := Nothing]
+       ht <- variable [value := 0]
+       wt <- variable [value := 0]
+
+       sw <- scrolledWindow f [ on paint := onPaint mazemap ht wt
+                              , virtualSize := sz 500 320, scrollRate := sz 10 10
+                              , fullRepaintOnResize := False]
+
+       quitBtn <- button f [text := "Quit", on command := close f]
+       loadBtn <- button f [text := "Open Maze", on command := onOpen f sw mazemap ht wt]
+       solveBtn <- button f [text := "Solve Maze", on command := solveIt sw mazemap]
+       rndmBtn <- button f [text := "Random", on command := randMaze sw mazemap ht wt]
+
+       set f [layout := (column 2 [(row 3 [floatCentre(widget quitBtn),
+                                   floatCentre(widget loadBtn),
+                                   floatCenter(widget solveBtn),
+                                   floatCenter(widget rndmBtn)]),
+                                   floatCentre(minsize (sz 527 330) $ fill $ widget sw)])]       
+       where
+        onOpen f sw mazemap ht wt
+          = do mbfname <- fileOpenDialog f False True "Open image" mapFiles "" ""
+               case mbfname of
+                    Nothing    -> return ()
+                    Just fname -> openMaze sw mazemap ht wt fname
+        
+        openMaze sw mazemap ht wt fname
+          = do
+                s <- readLines fname
+                set ht [value := (length s)]
+                set wt [value := (length $ head s)]
+                set mazemap [value := Just (buildMazeMap s)]
+                set sw [virtualSize := (sz ((length s)*cellDim) ((length $ head s)*cellDim))]
+                repaint sw
+        
+        solveIt sw mazemap
+          = do mz <- get mazemap value
+               case mz of
+                    Nothing -> return ()
+                    Just m  -> do
+                                set mazemap [value := Just (solveMaze m)]
+                                repaint sw
+
+        randMaze sw mazemap ht wt
+          = do
+                set ht [value := (defPuzHeight+1)]
+                set wt [value := (defPuzWidth+1)]
+                mzs <- sample' $ genRandomMaze defPuzHeight defPuzWidth
+                set mazemap [value := Just (head mzs)]
+                repaint sw
+          
+        
+        onPaint mazemap ht wt dc _
+          = do mz <- get mazemap value
+               case mz of
+                    Nothing -> return ()
+                    Just m  -> paintMaze m ht wt dc
+
+        paintMaze mazemap ht wt dc
+          = do
+                height <- get ht value
+                width <- get wt value
+                paintRows mazemap (height-1) (width-1) dc
+
+        paintRows mazemap 0      width dc = paintRow mazemap 0 width dc
+        paintRows mazemap height width dc
+          = do
+                paintRows mazemap (height-1) width dc
+                paintRow  mazemap height width dc
+
+        paintRow mazemap rrow 0 dc = paintCell mazemap rrow 0 dc
+        paintRow mazemap rrow col dc
+          = do
+                paintRow mazemap rrow (col-1) dc
+                paintCell mazemap rrow (col-1) dc
+
+        paintCell mazemap rrow col dc = case (findWithDefault E (rrow,col) mazemap) of
+           (N _ Space False _) -> 
+              drawRect dc (Rect (col*cellDim) (rrow*cellDim) cellDim cellDim) [color := grey, penWidth :~ (+1), penKind := PenSolid, brushKind := BrushSolid, brushColor := grey]
+           (N _ Space True _)  -> 
+              drawRect dc (Rect (col*cellDim) (rrow*cellDim) cellDim cellDim) [color := yellow, penWidth :~ (+1), penKind := PenSolid, brushKind := BrushSolid, brushColor := yellow]
+           (N _ Start _ _)     -> 
+              drawRect dc (Rect (col*cellDim) (rrow*cellDim) cellDim cellDim) [color := green, penWidth :~ (+1), penKind := PenSolid, brushKind := BrushSolid, brushColor := green]
+           (N _ End _ _)       -> 
+              drawRect dc (Rect (col*cellDim) (rrow*cellDim) cellDim cellDim) [color := red, penWidth :~ (+1), penKind := PenSolid, brushKind := BrushSolid, brushColor := red]
+           _                   -> 
+              drawRect dc (Rect (col*cellDim) (rrow*cellDim) cellDim cellDim) [color := black, penWidth :~ (+1), penKind := PenSolid, brushKind := BrushSolid, brushColor := black]
+               
+
+cmdLine :: IO ()
+cmdLine = do
+  putStrLn $ "Please enter a map filename:"
+  filename <- getLine
+  s <- readLines filename
   let height = length s
   let width = length $ head s
   let mazeMap = buildMazeMap s 
-  putStrLn $ "MazeMap:\n" ++ (show mazeMap)
   putStrLn $ "Maze:\n" ++ (showMaze mazeMap height width)
+  let solvedMaze = solveMaze mazeMap
+  putStrLn $ "Solution:\n" ++ (showMaze solvedMaze height width)
 
 data NodeType = Start | End | Space
                 deriving Show
@@ -75,53 +187,23 @@ showRandomMaze' = do
 genRandomMaze :: Int -> Int -> Gen MazeMap
 genRandomMaze height width = do 
     spaces <- genRows height width
-    start  <- oneof [genStartRowPt, genStartColPt]
+    sstart <- oneof [genStartRowPt, genStartColPt]
     end    <- oneof [genEndRowPt, genEndColPt]
-    sol    <- randomPath start end
-    let randomCells = insertNodes empty spaces Space
+    sol    <- randomPath sstart end
+    let randomCells = insertNodes M.empty spaces Space
         solvable = insertNodes randomCells sol Space
-        startable = insertNode solvable start Start
+        startable = insertNode solvable sstart Start
         endable = insertNode startable end End
     return $ endable
     where
       genStartRowPt = liftM ((,) 0) (choose (0, ((width `div` 2)-1)))
-      genStartColPt = liftM (\ row -> (row, 0)) 
+      genStartColPt = liftM (\ rrow -> (rrow, 0)) 
                       (choose (0, ((height `div` 2)-1)))
       genEndRowPt   = liftM ((,) (height-1)) 
                       (choose ((width `div` 2)-1, width-1))
-      genEndColPt   = liftM (\ row -> (row, width-1)) 
+      genEndColPt   = liftM (\ rrow -> (rrow, width-1)) 
                       (choose ((height `div` 2)-1, height-1))
-                      
-genRandomMaze' :: Int -> Int -> Gen MazeMap
-genRandomMaze' height width = do 
-    spaces <- genRows height width
-    start  <- oneof [genStartRowPt, genStartColPt]
-    end    <- oneof [genEndRowPt, genEndColPt]
-    sol    <- randomPath start end
-    let randomCells = insertNodes empty spaces Space
-        solvable = insertNodes randomCells sol Space
-        startable = insertNode solvable start Start
-        endable = insertNode startable end End
-    return $ endable
-    where
-      genStartRowPt = liftM ((,) 0) (choose (0, ((width `div` 2)-1)))
-      genStartColPt = liftM (\ row -> (row, 0)) 
-                      (choose (0, ((height `div` 2)-1)))
-      genEndRowPt   = liftM ((,) (height-1)) 
-                      (choose ((width `div` 2)-1, width-1))
-      genEndColPt   = liftM (\ row -> (row, width-1)) 
-                      (choose ((height `div` 2)-1, height-1))    
-                      
-genPaths :: Int -> Int -> Gen [(Int, Int)]
-genPaths height width = do
-  startPt <- genPt height width
-  endPt   <- genPt height width
-  liftM concat $ vectorOf 4 $ randomPath (5,1) (6,5)
-  
-genPt :: Int -> Int -> Gen (Int, Int)
-genPt height width = liftM2 (,) (choose (0, height-1)) (choose (0, width-1))
-
-
+    
 randomPath :: (Int,Int) -> (Int,Int) -> Gen [(Int,Int)]
 randomPath (sx, sy) (ex, ey) 
   | (sx == ex) && (sy == ey) = do
@@ -148,15 +230,15 @@ genRows 0 width =  genRow 0 width
 genRows height width = liftM2 (++) (genRows (height-1) width) 
                        (genRow height width)
 
-genRow :: Int -> Int -> Gen [(Int, Int)]
-genRow row 0     = do   
-  cell <- genCell row 0
+genRow :: Int -> Int -> Gen[(Int, Int)]
+genRow rrow 0     = do   
+  cell <- genCell rrow 0
   return $ cell ++ []
-genRow row width = liftM2 (++) (genCell row width) (genRow row (width-1))
+genRow rrow width = liftM2 (++) (genCell rrow width) (genRow rrow (width-1))
 
 genCell :: Int -> Int -> Gen [(Int, Int)]
-genCell row col = frequency [ (7, return [])
-                            , (3, return [(row, col)]) ]
+genCell rrow col = frequency [ (7, return [])
+                               , (3, return [(rrow,col)])]
 
 -- Display Functions
 showMaze :: MazeMap -> Int -> Int -> String
@@ -168,26 +250,28 @@ showRows mazeMap height width = (showRows mazeMap (height-1) width) ++
                                 '\n' : (showRow mazeMap height width)
                                 
 showRow :: MazeMap -> Int -> Int -> String
-showRow mazeMap row 0     = showCell mazeMap row 0
-showRow mazeMap row width =  (showRow mazeMap row (width-1)) ++ 
-                             (showCell mazeMap row width)
+showRow mazeMap rrow 0     = showCell mazeMap rrow 0
+showRow mazeMap rrow width =  (showRow mazeMap rrow (width-1)) ++ 
+                             (showCell mazeMap rrow width)
 
 showCell :: MazeMap -> Int -> Int -> String
-showCell mazeMap row col = case node of
-  N _ Space True  _ -> "+"
-  N _ Space False _ -> " "
-  N _ Start _     _ -> "S"
-  N _ End   _     _ -> "E"
-  E                 -> "*"
-  where
-    node = findWithDefault E (row,col) mazeMap
+showCell mazeMap rrow col = case (findWithDefault E (rrow,col) mazeMap) of
+  (N _ Space False _) -> " "
+  (N _ Space True _)  -> "+"
+  (N _ Start _ _)     -> "S"
+  (N _ End _ _)       -> "E"
+  _                   -> "*"
+
+getNodeType :: Node -> NodeType
+getNodeType E = Wall
+getNodeType (N _ nType _ _) = nType
   
 -- Construction Functions
 buildMazeMap :: [String] -> MazeMap
 buildMazeMap rows = mazeMap
   where
-    start = insertNodes empty (getCoords 'S' rows) Start
-    spaces = insertNodes start (getCoords ' ' rows) Space
+    sstart = insertNodes M.empty (getCoords 'S' rows) Start
+    spaces = insertNodes sstart (getCoords ' ' rows) Space
     mazeMap = insertNodes spaces (getCoords 'E' rows) End
 
 insertNodes :: MazeMap -> [(Int,Int)] -> NodeType -> MazeMap
@@ -252,8 +336,8 @@ shortestPath from to mazemap = reverse $ f to where
 
 solveMaze :: MazeMap -> MazeMap
 solveMaze mazemap = foldr (\k m -> adjust markAsSolution k m) mazemap sol where
-          sol = shortestPath start end mazemap where
-              start = head $ L.filter (\x -> isStart $ mazemap ! x) 
+          sol = shortestPath sstart end mazemap where
+              sstart = head $ L.filter (\x -> isStart $ mazemap ! x) 
                       $ keys mazemap
               end   = head $ L.filter (\x -> isEnd $ mazemap ! x) 
                       $ keys mazemap
