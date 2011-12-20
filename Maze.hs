@@ -238,7 +238,7 @@ genRow rrow width = liftM2 (++) (genCell rrow width) (genRow rrow (width-1))
 
 genCell :: Int -> Int -> Gen [(Int, Int)]
 genCell rrow col = frequency [ (7, return [])
-                            , (3, return [(rrow, col)]) ]                       
+                               , (3, return [(rrow,col)])]
 
 -- Display Functions
 showMaze :: MazeMap -> Int -> Int -> String
@@ -265,7 +265,8 @@ showCell mazeMap rrow col = case (findWithDefault E (rrow,col) mazeMap) of
 getNodeType :: Node -> NodeType
 getNodeType E = Wall
 getNodeType (N _ nType _ _) = nType
-
+  
+-- Construction Functions
 buildMazeMap :: [String] -> MazeMap
 buildMazeMap rows = mazeMap
   where
