@@ -4,7 +4,8 @@
 {-# OPTIONS -Wall -fwarn-tabs -fno-warn-type-defaults -XTypeSynonymInstances #-}
 
 module Tests where
-import Maze
+import Solver
+import RandomMaze
 import Test.HUnit hiding (Node)
 import Data.HashMap as M
 
